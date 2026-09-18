@@ -151,26 +151,30 @@ Live reports are written to ignored `artifacts/live-test-report.json` or `artifa
 
 ## Docker fallback
 
-Docker must be running. The build context permits only source/configuration files and excludes `.env` and all other files by default. The image runs as the non-root `node` user and includes a health check.
+Docker must be running. The build context permits only source/configuration files and excludes `.env` and all other files by default. The image runs as the non-root `node` user, **exposes port `3000` bound to `0.0.0.0`**, and includes a health check.
+
+**Required environment variables** (same names/defaults as [Configuration](#configuration) above): `OPENAI_API_KEY` (required secret, no default), `OPENAI_MODEL`, `PORT`, `OPENAI_TIMEOUT_MS`, `OPENAI_MAX_ATTEMPTS`, `CACHE_MAX_ENTRIES`, `CACHE_TTL_SECONDS`. Inject them at runtime with `--env-file` or `-e`; the build never bakes in a key.
 
 ```bash
 docker build -t gridwise:1.0.0 .
 docker run --rm --name gridwise -p 3000:3000 --env-file .env -e PORT=3000 gridwise:1.0.0
+curl --fail-with-body http://localhost:3000/health
 ```
 
 Or run `docker compose up --build -d`. Then use the same health and sample test commands above. Do not run both the host service and Docker on port 3000 simultaneously.
 
-The published fallback is `onukrom/gridwise:1.0.0`. Pull and run the recorded immutable digest:
+**Registry image (pullable without login):** `onukrom/gridwise:1.0.0` on Docker Hub, a public repository. Pull and run the exact tested, immutable digest:
 
 ```bash
 docker pull --platform linux/amd64 onukrom/gridwise@sha256:10ca66bc808fc81a2e204cd0927b5740a23043bdb81b65420f7728cd81d7b6b3
 docker run --rm --platform linux/amd64 -p 3000:3000 --env-file .env -e PORT=3000 \
   onukrom/gridwise@sha256:10ca66bc808fc81a2e204cd0927b5740a23043bdb81b65420f7728cd81d7b6b3
+curl --fail-with-body http://localhost:3000/health
 ```
 
 On an arm64 host (e.g. Apple Silicon), `--platform linux/amd64` is required on both commands — a plain `docker pull` there fails with "no matching manifest" since only an amd64 image is published. Typical judge servers are amd64 already and don't need the flag.
 
-This digest has been pulled and tested. A later source change does not update this immutable image; publish a new version when releasing changes and record its new digest here.
+This exact digest was pulled fresh and verified: `/health` returns `200 {"status":"ok"}` and all 10 public sample cases pass through the running container with the real OpenAI key. A filesystem and `docker history --no-trunc` scan of the image found no `.env` file and no occurrence of the configured key anywhere in the image or its build history. A later source change does not update this immutable image; publish a new version when releasing changes and record its new digest here.
 
 ## Reproducing the deployment elsewhere
 
@@ -199,3 +203,9 @@ If cPanel's install-check shows a content-type warning after "NPM Install," that
 - Floating-point replay uses 0.00001 internal tolerance and public-reference tests use at most 0.01. Very large values can exceed practical floating-point accuracy; such results fail replay instead of returning an invalid plan. The HTTP adapter's default body limit applies.
 - The hosted LLM may misunderstand an unseen note while still returning structurally valid output. Deterministic validation cannot prove natural-language correctness; live paraphrase tests measure it. Remote latency can exceed the five-second full-score target. The live service runs on shared cPanel hosting (Passenger); an idle application can be recycled and the first request after idle time may be slower than a warm one. Availability throughout judging must be monitored.
 - Node.js 20 (used by the DianaHost compatibility profile) is end-of-life upstream; that profile lets the app run on a host that doesn't yet offer a newer runtime, it doesn't extend Node 20's own support window.
+
+## Dependencies and credits
+
+NestJS provides the server and Swagger integration; OpenAI's official JavaScript SDK and Responses API provide language interpretation; Zod validates schemas; `javascript-lp-solver` provides the simplex implementation; dotenv loads local environment configuration; TypeScript, Node.js and npm build/run/test the application; `@nestjs/testing` provides test-only dependency overrides and Prettier provides consistent source formatting. Direct and transitive versions are locked in `package-lock.json`. RxJS and reflect-metadata support NestJS. Docker provides packaging. Test inputs and reference results are supplied by BUP CSE Fest 2026. An AI coding assistant (Claude Code) assisted with implementation and verification; the team reviewed, understands, and can explain the code, in accordance with the guide's ownership requirement.
+
+Implementation references: [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [model documentation](https://developers.openai.com/api/docs/models/gpt-4.1-mini), [NestJS OpenAPI](https://docs.nestjs.com/openapi/introduction), [solver documentation](https://github.com/JWally/jsLPSolver).
