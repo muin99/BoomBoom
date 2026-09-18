@@ -1,5 +1,8 @@
 const assert=require('node:assert/strict');
-const {replay}=require('../dist/replay');
+const {PlanReplayService}=require('../dist/energy/services/plan-replay.service');
+const {DirectiveValidatorService}=require('../dist/interpretation/services/directive-validator.service');
+const planReplay=new PlanReplayService(new DirectiveValidatorService());
+const replay=(scenario,raw,groundTruth,tolerance)=>planReplay.verify(scenario,raw,groundTruth,tolerance);
 function equivalent(a,b,path='directive') {
   if(typeof b==='number'){assert.equal(typeof a,'number',path);assert.ok(Math.abs(a-b)<=0.01,path);return;}
   if(b===null||typeof b!=='object'){assert.equal(a,b,path);return;}

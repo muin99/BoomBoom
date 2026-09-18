@@ -3,7 +3,7 @@
   "paths": {
     "/health": {
       "get": {
-        "operationId": "GridWiseController_health",
+        "operationId": "HealthController_health",
         "parameters": [],
         "responses": {
           "200": {
@@ -59,7 +59,7 @@
     "/optimize-energy": {
       "post": {
         "description": "OpenAI structured extraction → deterministic guardrails → linear program → independent schedule replay. No authentication required. All energy units are kWh, currency BDT. Windows include start and exclude end.",
-        "operationId": "GridWiseController_optimize",
+        "operationId": "EnergyController_optimize",
         "parameters": [],
         "requestBody": {
           "required": true,

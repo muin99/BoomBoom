@@ -1,9 +1,21 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { requestSchema, validateDirectives } = require('../dist/contracts');
-const { optimize, InfeasibleScenario } = require('../dist/optimizer');
-const { replay } = require('../dist/replay');
+const { requestSchema } = require('../dist/energy/dto/optimize-energy-request.dto');
+const { DirectiveValidatorService } = require('../dist/interpretation/services/directive-validator.service');
+const { EnergyOptimizerService } = require('../dist/energy/services/energy-optimizer.service');
+const { PlanReplayService } = require('../dist/energy/services/plan-replay.service');
+const { InfeasibleScenario } = require('../dist/energy/errors/infeasible-scenario.error');
 const pack = require('../BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json');
+
+// Thin wrappers over the real NestJS services, matching the pre-refactor flat-function API
+// so the test bodies below exercise the actual production classes unchanged.
+const directiveValidator = new DirectiveValidatorService();
+const optimizer = new EnergyOptimizerService();
+const planReplay = new PlanReplayService(directiveValidator);
+const validateDirectives = (raw, scenario) => directiveValidator.validate(raw, scenario);
+const optimize = (scenario, directives) => optimizer.optimize(scenario, directives);
+const replay = (scenario, raw, groundTruth) => planReplay.verify(scenario, raw, groundTruth);
+
 const noop = [{ note_index:0, applies:false, directive_type:'no_op', structured_adjustment:null, explanation:'Unrelated.' }];
 const scenario = () => ({ scenario_id:'generated', operator_notes:['Administrative notice.'],
   hours:Array.from({length:24},(_,hour)=>({hour,demand_kwh:2,solar_kwh:0,tariff_bdt_per_kwh:1})),

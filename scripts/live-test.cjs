@@ -1,13 +1,13 @@
 const fs=require('node:fs');
-const {createApp}=require('../dist/app');
-const {readConfig}=require('../dist/config');
+const {createApp}=require('../dist/bootstrap');
+const {readConfig}=require('../dist/config/environment');
 const {verifyCase}=require('./verify.cjs');
 const pack=require('../BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json');
 
 async function main(){
   const config=readConfig();
   if(!config.apiKey){console.error('OPENAI_API_KEY is empty. Add your key to .env, then rerun npm run test:live.');process.exitCode=1;return;}
-  const {app}=await createApp({config,quiet:true});
+  const {app}=await createApp({quiet:true});
   await app.listen(0,'127.0.0.1');
   const base=await app.getUrl(), results=[];
   const smoke=process.argv.includes('--smoke');

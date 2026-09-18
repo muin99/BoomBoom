@@ -1,10 +1,34 @@
 const { test }=require('node:test');
 const assert=require('node:assert/strict');
-const { createApp }=require('../dist/app');
-const { OpenAiInterpreter }=require('../dist/interpreter');
-const { readConfig }=require('../dist/config');
-const { replay }=require('../dist/replay');
+const { Test }=require('@nestjs/testing');
+const { AppModule }=require('../dist/app.module');
+const { configureApp }=require('../dist/bootstrap');
+const { NOTE_INTERPRETER }=require('../dist/interpretation/interfaces/note-interpreter.interface');
+const { APP_CONFIG }=require('../dist/config/configuration.module');
+const { readConfig }=require('../dist/config/environment');
+const { OpenAiInterpreterService }=require('../dist/interpretation/services/openai-interpreter.service');
+const { DirectiveValidatorService }=require('../dist/interpretation/services/directive-validator.service');
+const { InterpretationCacheService }=require('../dist/interpretation/services/interpretation-cache.service');
+const { PlanReplayService }=require('../dist/energy/services/plan-replay.service');
 const pack=require('../BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json');
+
+// Builds the real Nest application graph (real controllers/services/filters/Swagger), only
+// swapping the NOTE_INTERPRETER or APP_CONFIG tokens when a test needs to control them.
+async function createApp({ interpreter, config, quiet } = {}) {
+  const builder = Test.createTestingModule({ imports: [AppModule] });
+  if (interpreter) builder.overrideProvider(NOTE_INTERPRETER).useValue(interpreter);
+  if (config) builder.overrideProvider(APP_CONFIG).useValue(config);
+  const moduleRef = await builder.compile();
+  const app = moduleRef.createNestApplication({ logger: quiet ? false : ['log', 'warn'] });
+  configureApp(app);
+  await app.init();
+  return { app };
+}
+
+const planReplay = new PlanReplayService(new DirectiveValidatorService());
+const replay = (scenario, raw, groundTruth) => planReplay.verify(scenario, raw, groundTruth);
+const makeInterpreter = (config, client) =>
+  new OpenAiInterpreterService(config, client, new DirectiveValidatorService(), new InterpretationCacheService(config));
 
 test('HTTP contract: ten reference cases, Swagger, validation and sanitized failures',async t=>{
   let selected=pack.cases[0];
@@ -35,7 +59,7 @@ test('missing key produces controlled readiness and optimization failures',async
 test('LLM path retries bad structured output, caches valid output, and coalesces requests',async()=>{
   const c=pack.cases[0];let calls=0;
   const fake={responses:{parse:async()=>{calls++;await new Promise(r=>setTimeout(r,10));return {status:'completed',output_parsed:{directive_interpretation:calls===1?[]:structuredClone(c.expected_output.directive_interpretation)}};}}};
-  const interpreter=new OpenAiInterpreter({...readConfig(),apiKey:'test-only',attempts:2},fake);
+  const interpreter=makeInterpreter({...readConfig(),apiKey:'test-only',attempts:2},fake);
   const results=await Promise.all(Array.from({length:8},()=>interpreter.interpret(c.input)));
   assert.equal(calls,2);assert.deepEqual(results[0],c.expected_output.directive_interpretation);
   results[0][0].explanation='changed';assert.notEqual((await interpreter.interpret(c.input))[0].explanation,'changed');assert.equal(calls,2);
@@ -48,7 +72,7 @@ test('invalid output and provider authentication errors fail safely without fake
     {responses:{parse:async()=>({status:'completed',output_parsed:{directive_interpretation:[]}})}},
     {responses:{parse:async()=>{throw new OpenAI.AuthenticationError(401,{message:'SECRET-key'},'SECRET-key',new Headers())}}},
   ]){
-    const interpreter=new OpenAiInterpreter({...readConfig(),apiKey:'test-only'},fake);
+    const interpreter=makeInterpreter({...readConfig(),apiKey:'test-only'},fake);
     await assert.rejects(()=>interpreter.interpret(pack.cases[0].input),e=>!e.message.includes('SECRET'));
   }
 });
