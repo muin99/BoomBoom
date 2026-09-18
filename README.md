@@ -44,16 +44,16 @@ The example is public SAMPLE-01. Expected cost is **38365 BDT** and total grid i
 
 ## Configuration
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `OPENAI_API_KEY` | empty | Required server-side credential. Fill `.env` locally or the host's secret environment settings. |
-| `OPENAI_MODEL` | `gpt-4.1-mini-2025-04-14` | OpenAI model snapshot supporting Responses structured output. Account access must be verified. |
-| `PORT` | `3000` | Listening port, bound to `0.0.0.0`. |
-| `OPENAI_TIMEOUT_MS` | `11000` | Deadline for each provider attempt. |
-| `OPENAI_MAX_ATTEMPTS` | `2` | One or two attempts; SDK retries are disabled. |
-| `CACHE_MAX_ENTRIES` | `256` | Maximum validated interpretation entries; `0` disables caching. |
-| `CACHE_TTL_SECONDS` | `300` | Interpretation cache lifetime; `0` disables caching. |
-| `BASE_URL` | `http://localhost:3000` | Target URL for public-sample and judge-audit scripts; the judge audit starts a local server when omitted. |
+| Variable              | Default                   | Meaning                                                                                                   |
+| --------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `OPENAI_API_KEY`      | empty                     | Required server-side credential. Fill`.env` locally or the host's secret environment settings.            |
+| `OPENAI_MODEL`        | `gpt-4.1-mini-2025-04-14` | OpenAI model snapshot supporting Responses structured output. Account access must be verified.            |
+| `PORT`                | `3000`                    | Listening port, bound to`0.0.0.0`.                                                                        |
+| `OPENAI_TIMEOUT_MS`   | `11000`                   | Deadline for each provider attempt.                                                                       |
+| `OPENAI_MAX_ATTEMPTS` | `2`                       | One or two attempts; SDK retries are disabled.                                                            |
+| `CACHE_MAX_ENTRIES`   | `256`                     | Maximum validated interpretation entries;`0` disables caching.                                            |
+| `CACHE_TTL_SECONDS`   | `300`                     | Interpretation cache lifetime;`0` disables caching.                                                       |
+| `BASE_URL`            | `http://localhost:3000`   | Target URL for public-sample and judge-audit scripts; the judge audit starts a local server when omitted. |
 
 The provider timeout multiplied by attempts must be at most 25 seconds, leaving room within the 30-second judge limit. Model latency and quota remain external dependencies. No key belongs in a Swagger request, URL, repository, Docker build argument, or submission field.
 
@@ -67,16 +67,16 @@ JSON → request validation → OpenAI structured note interpretation
 
 The source is a standard NestJS module/controller/service layout, one feature per module:
 
-| Layer | Source | Responsibility |
-|---|---|---|
-| Bootstrap | `src/main.ts`, `src/bootstrap.ts`, `src/app.module.ts` | Process entry point, Nest app assembly, global pipes/filters/Swagger wiring |
-| Configuration | `src/config/environment.ts`, `src/config/configuration.module.ts`, `.env.example` | Env parsing and a global `APP_CONFIG` provider for credential, model, port and time budget |
-| Shared/common | `src/common/validation/value.schemas.ts`, `src/common/swagger/*`, `src/common/filters/safe-exception.filter.ts` | Shared Zod primitives, OpenAPI schema generation from those same schemas, sanitized error responses |
-| Energy controller | `src/energy/energy.controller.ts`, `src/energy/pipes/optimize-energy-request.pipe.ts` | `POST /optimize-energy` route and Zod-backed request validation pipe |
-| Energy models/DTOs | `src/energy/models/scenario.model.ts`, `plan.model.ts`, `src/energy/dto/optimize-energy-request.dto.ts`, `optimize-energy-response.dto.ts` | Request/output schemas and cross-field guardrails |
-| Energy services | `src/energy/services/energy.service.ts`, `energy-optimizer.service.ts`, `plan-replay.service.ts`, `src/energy/optimization/energy-lp.model.ts` | Orchestration (interpret → validate → optimize → replay), LP construction/solve, independent replay verification |
-| Interpretation | `src/interpretation/services/openai-interpreter.service.ts`, `directive-validator.service.ts`, `interpretation-cache.service.ts`, `providers/openai-client.provider.ts`, `prompts/operator-notes.prompt.ts`, `models/directive.model.ts` | Real OpenAI Responses extraction behind a `NoteInterpreter` interface, deadlines, retries, validated cache, directive guardrails |
-| Health | `src/health/health.controller.ts`, `health.service.ts` | `GET /health` readiness check that exercises the same interpreter dependency |
+| Layer              | Source                                                                                                                                                                                                                                   | Responsibility                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Bootstrap          | `src/main.ts`, `src/bootstrap.ts`, `src/app.module.ts`                                                                                                                                                                                   | Process entry point, Nest app assembly, global pipes/filters/Swagger wiring                                                     |
+| Configuration      | `src/config/environment.ts`, `src/config/configuration.module.ts`, `.env.example`                                                                                                                                                        | Env parsing and a global`APP_CONFIG` provider for credential, model, port and time budget                                       |
+| Shared/common      | `src/common/validation/value.schemas.ts`, `src/common/swagger/*`, `src/common/filters/safe-exception.filter.ts`                                                                                                                          | Shared Zod primitives, OpenAPI schema generation from those same schemas, sanitized error responses                             |
+| Energy controller  | `src/energy/energy.controller.ts`, `src/energy/pipes/optimize-energy-request.pipe.ts`                                                                                                                                                    | `POST /optimize-energy` route and Zod-backed request validation pipe                                                            |
+| Energy models/DTOs | `src/energy/models/scenario.model.ts`, `plan.model.ts`, `src/energy/dto/optimize-energy-request.dto.ts`, `optimize-energy-response.dto.ts`                                                                                               | Request/output schemas and cross-field guardrails                                                                               |
+| Energy services    | `src/energy/services/energy.service.ts`, `energy-optimizer.service.ts`, `plan-replay.service.ts`, `src/energy/optimization/energy-lp.model.ts`                                                                                           | Orchestration (interpret → validate → optimize → replay), LP construction/solve, independent replay verification                |
+| Interpretation     | `src/interpretation/services/openai-interpreter.service.ts`, `directive-validator.service.ts`, `interpretation-cache.service.ts`, `providers/openai-client.provider.ts`, `prompts/operator-notes.prompt.ts`, `models/directive.model.ts` | Real OpenAI Responses extraction behind a`NoteInterpreter` interface, deadlines, retries, validated cache, directive guardrails |
+| Health             | `src/health/health.controller.ts`, `health.service.ts`                                                                                                                                                                                   | `GET /health` readiness check that exercises the same interpreter dependency                                                    |
 
 The energy and health services depend only on the `NOTE_INTERPRETER` interface (`src/interpretation/interfaces/note-interpreter.interface.ts`), not on the OpenAI SDK directly, so the interpretation module can be swapped or mocked without touching scheduling code. See [the source reading guide](src/README.md) for a recommended file-by-file reading order.
 
@@ -88,14 +88,14 @@ The LLM is directly responsible for semantic interpretation of every note. It is
 4. Apply all relevant directives and solve the 24-hour LP using `javascript-lp-solver`'s simplex solver. The objective is exactly the sum of grid import multiplied by tariff. No invented peak penalty or battery degradation cost changes the objective.
 5. Replay the actual response against the original inputs and each directive, checking solar use, energy balance, battery transitions, bounds, rates, restricted windows, caps, neutrality, schema, and recalculated totals. A failed replay returns a controlled error.
 
-| Directive | Exact adjustment | Scheduling effect |
-|---|---|---|
-| `solar_reduction` | `{hours, factor}` | Available solar = original forecast × remaining fraction. |
+| Directive                 | Exact adjustment              | Scheduling effect                                         |
+| ------------------------- | ----------------------------- | --------------------------------------------------------- |
+| `solar_reduction`         | `{hours, factor}`             | Available solar = original forecast × remaining fraction. |
 | `minimum_battery_reserve` | `{hours, minimum_energy_kwh}` | End-of-hour energy ≥ maximum of base and active reserves. |
-| `no_charge_window` | `{hours}` | Battery energy cannot increase in those hours. |
-| `no_discharge_window` | `{hours}` | Battery energy cannot decrease in those hours. |
-| `max_grid_window` | `{hours, max_grid_kwh}` | Grid import cannot exceed the cap in any listed hour. |
-| `no_op` | `null` | No constraint added; `applies=false`. |
+| `no_charge_window`        | `{hours}`                     | Battery energy cannot increase in those hours.            |
+| `no_discharge_window`     | `{hours}`                     | Battery energy cannot decrease in those hours.            |
+| `max_grid_window`         | `{hours, max_grid_kwh}`       | Grid import cannot exceed the cap in any listed hour.     |
+| `no_op`                   | `null`                        | No constraint added;`applies=false`.                      |
 
 Every other directive has `applies=true`. Time windows include the starting hour and exclude the ending hour. Unused solar is curtailed, grid export is prohibited, and terminal stored energy equals the initial energy. The model uses the specification's lossless battery behavior.
 
@@ -203,9 +203,3 @@ If cPanel's install-check shows a content-type warning after "NPM Install," that
 ## Submission notes
 
 Create the GitHub repository after question reveal, keep it private during the event, and make it public only after the submission deadline. Keep the public API, fallback image, and repository accessible for evaluation. The provided guide's round window is 7–11 PM; it does not establish the actual event date. Follow the organizers' announced timing. Do not submit credentials in public fields. No solution video is included with this submission; per the official rubric, the video affects only tie-breaks and carries no base-score points.
-
-## Dependencies and credits
-
-NestJS provides the server and Swagger integration; OpenAI's official JavaScript SDK and Responses API provide language interpretation; Zod validates schemas; `javascript-lp-solver` provides the simplex implementation; dotenv loads local environment configuration; TypeScript, Node.js and npm build/run/test the application; `@nestjs/testing` provides test-only dependency overrides and Prettier provides consistent source formatting. Direct and transitive versions are locked in `package-lock.json`. RxJS and reflect-metadata support NestJS. Docker provides packaging. Test inputs and reference results are supplied by BUP CSE Fest 2026. OpenAI Codex assisted with implementation and verification; the team should review, understand, and be able to explain the code, in accordance with the guide's ownership requirement.
-
-Implementation references: [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [model documentation](https://developers.openai.com/api/docs/models/gpt-4.1-mini), [NestJS OpenAPI](https://docs.nestjs.com/openapi/introduction), [solver documentation](https://github.com/JWally/jsLPSolver).
