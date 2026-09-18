@@ -2,6 +2,8 @@
 
 Both source PDFs were read in full, with their extracted text preserved in `docs/source/`. Line references below refer to those text files. The embedded processing-flow diagram on Problem Statement page 3 was also visually checked. The public JSON pack was read in full, including its metadata, all inputs, reference outputs and rationales. No hidden judge data is available.
 
+Latest execution evidence: [judge audit](judge-audit.md), including 18 additional live edge cases and 500 generated fractional solver scenarios. Video is excluded from that audit.
+
 PS = `docs/source/problem-statement.txt`; PG = `docs/source/participant-guide.txt`. External requirements are not marked complete merely because a configuration file exists.
 
 | Source | Requirement | Implementation or evidence |
@@ -35,7 +37,7 @@ PS = `docs/source/problem-statement.txt`; PG = `docs/source/participant-guide.tx
 | PG §4 | Deterministic processing allowed, solver libraries allowed | Zod guardrails and disclosed simplex solver |
 | PG §4 | Never commit/expose secrets or sensitive stacks/prompts | Git ignore, Docker allowlist, sanitized filters/provider errors, key-redaction tests |
 | PG §4 | Synthetic data only | Organizer samples and synthetic generated scenarios |
-| PG §4 | New repository after reveal; private during event; public after deadline | `https://github.com/muin99/BoomBoom` created and confirmed private (2026-09-18); switch to public only after the submission deadline |
+| PG §4 | New repository after reveal; private during event; public after deadline | Authenticated fresh clone of `https://github.com/muin99/BoomBoom` verified; unauthenticated access returns 404. Creation relative to reveal remains unverified; make public after the submission deadline |
 | PG §4 | Credit tools; team owns/understands core design | README dependency/Codex credits and mathematical explanation; team review needed |
 | PG §5 | API, interpretation, guardrails, energy, robustness, local reproducibility checks | Offline HTTP tests, live runner, reference examples and Docker smoke tests |
 | PG §5 | No secrets in public submission fields | Submission template contains no credentials |
@@ -43,7 +45,7 @@ PS = `docs/source/problem-statement.txt`; PG = `docs/source/participant-guide.tx
 | PG §6–7 | Validity before cost; video is tie-break only | Ground-truth replay precedes cost check; required video remains deliverable |
 | PG §7 | Cost score ratio and zero-cost edge case | Exact LP minimum, zero tariff/surplus tests; official scoring not reproduced as hidden judge |
 | PG §8 | Health ready within 60s; requests under 30s | Startup and live timing checks; bounded 25s provider budget |
-| PG §8 | p95 bands ≤5s, ≤15s, ≤30s; failure-rate stability | Live report records uncached case timings; repeat/concurrency checks |
+| PG §8 | p95 bands ≤5s, ≤15s, ≤30s; failure-rate stability | Fresh local live report records case timings; public judge-audit timings may include cache hits; repeat/concurrency checks |
 | PG §8 | Safe malformed input, provider failures, secret handling | Controlled 400/422/500, retry/caching tests |
 | PG §9 | Invalid/ignored directives, balance/bounds/neutrality/totals lose correctness | Independent final replay blocks invalid successful responses |
 | PG §10 | Hidden paraphrases/numeric variation, no public hardcoding | Live paraphrases, random DP oracle, no production fixture import |

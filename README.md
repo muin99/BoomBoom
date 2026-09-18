@@ -4,14 +4,16 @@ A NestJS HTTP service that uses OpenAI to interpret campus operator notes, valid
 
 **Judge endpoints:** `GET /health` and `POST /optimize-energy`. **Swagger:** `/docs`. **OpenAPI JSON:** `/docs-json` or [docs/openapi.json](docs/openapi.json). No login or API key header is required by callers. The OpenAI credential stays on the server.
 
+Public service: [https://buphack.onrender.com](https://buphack.onrender.com). Source: [muin99/BoomBoom](https://github.com/muin99/BoomBoom). See [the source reading guide](src/README.md) for the module/controller/service layout.
+
 ## Local quickstart
 
 Requires Node.js 22 or later (Node.js 24 tested), npm, internet access, and an OpenAI API key with model access and sufficient quota. No database, Python, native solver, training, or GPU is needed to run the service.
 
-From a fresh clone, replace `YOUR_ACCOUNT` with the repository owner's GitHub name:
+From a fresh clone (repository access is required while it remains private during the event):
 
 ```bash
-git clone https://github.com/YOUR_ACCOUNT/gridwise.git
+git clone https://github.com/muin99/BoomBoom.git gridwise
 cd gridwise
 npm ci
 cp .env.example .env
@@ -51,7 +53,7 @@ The example is public SAMPLE-01. Expected cost is **38365 BDT** and total grid i
 | `OPENAI_MAX_ATTEMPTS` | `2` | One or two attempts; SDK retries are disabled. |
 | `CACHE_MAX_ENTRIES` | `256` | Maximum validated interpretation entries; `0` disables caching. |
 | `CACHE_TTL_SECONDS` | `300` | Interpretation cache lifetime; `0` disables caching. |
-| `BASE_URL` | `http://localhost:3000` | Used only by the external public-sample test script. |
+| `BASE_URL` | `http://localhost:3000` | Target URL for public-sample and judge-audit scripts; the judge audit starts a local server when omitted. |
 
 The provider timeout multiplied by attempts must be at most 25 seconds, leaving room within the 30-second judge limit. Model latency and quota remain external dependencies. No key belongs in a Swagger request, URL, repository, Docker build argument, video, or submission field.
 
@@ -95,17 +97,21 @@ npm run test:live
 npm run test:samples
 
 # Against the deployed public endpoint, preferably from a second network
-BASE_URL=https://YOUR-SERVICE.example npm run test:samples
+BASE_URL=https://buphack.onrender.com npm run test:samples
+
+# Judge-style checks: 10 public cases, 18 new edge cases, HTTP errors and concurrency
+npm run test:judge
+BASE_URL=https://buphack.onrender.com npm run test:judge
 
 # Regenerate the checked-in API documentation
 npm run export:openapi
 ```
 
-Offline HTTP tests inject known interpretations strictly inside the test harness. They do **not** prove language understanding. Live tests run all ten public cases plus four newly phrased equivalents and five concurrent repeated requests, compare all machine-checkable interpretation fields, replay using the organizer's ground truth, and require optimal cost within 0.01 BDT. The 100 generated solver cases are separately checked by a dynamic-programming oracle. Free-text explanations and tied optimal action sequences are not compared byte-for-byte.
+Offline HTTP tests inject known interpretations strictly inside the test harness. They do **not** prove language understanding. Live tests run all ten public cases plus four newly phrased equivalents and five concurrent repeated requests, compare all machine-checkable interpretation fields, replay using the organizer's ground truth, and require optimal cost within 0.01 BDT. Independent dynamic-programming oracles check 100 original generated cases plus 500 new fractional scenarios with directive combinations, including feasible and infeasible inputs. The judge audit adds 18 hand-authored language/energy edge cases and compares their costs with the independent oracle. Free-text explanations and tied optimal action sequences are not compared byte-for-byte.
 
 Live reports are written to ignored `artifacts/live-test-report.json` or `artifacts/key-check.json`. They record model, timestamp, results and measured p95. Live tests spend API credits. Failed checks exit nonzero. Public examples do not establish hidden-case accuracy.
 
-See [recorded verification results](docs/verification.md) for the completed local checks and measured timings. Use `npm run start:dev` for a compiler/server watcher during further development.
+See [the latest judge audit](docs/judge-audit.md) and [recorded verification results](docs/verification.md) for the completed local checks and measured timings. Use `npm run start:dev` for a compiler/server watcher during further development.
 
 ## Docker fallback
 
@@ -118,17 +124,17 @@ docker run --rm --name gridwise -p 3000:3000 --env-file .env -e PORT=3000 gridwi
 
 Or run `docker compose up --build -d`. Then use the same health and sample test commands above. Do not run both the host service and Docker on port 3000 simultaneously.
 
-After publishing an image, replace `YOUR_DOCKERHUB_ACCOUNT` with its actual account name:
+The published fallback is `onukrom/gridwise:1.0.0`. Pull and run the recorded immutable digest:
 
 ```bash
-docker pull --platform linux/amd64 YOUR_DOCKERHUB_ACCOUNT/gridwise:1.0.0
+docker pull --platform linux/amd64 onukrom/gridwise@sha256:10ca66bc808fc81a2e204cd0927b5740a23043bdb81b65420f7728cd81d7b6b3
 docker run --rm --platform linux/amd64 -p 3000:3000 --env-file .env -e PORT=3000 \
-  YOUR_DOCKERHUB_ACCOUNT/gridwise:1.0.0
+  onukrom/gridwise@sha256:10ca66bc808fc81a2e204cd0927b5740a23043bdb81b65420f7728cd81d7b6b3
 ```
 
 On an arm64 host (e.g. Apple Silicon), `--platform linux/amd64` is required on both commands — a plain `docker pull` there fails with "no matching manifest" since only an amd64 image is published. Typical judge servers are amd64 already and don't need the flag.
 
-Submit the exact registry tag **and preferably immutable digest** after actually pushing and testing it. The placeholder above is not a published image. See [account creation, hosting, registry publishing, and submission steps](docs/deployment.md).
+This digest has been pulled and tested. A later source change does not update this immutable image; publish a new version when releasing changes, and record its new digest in the submission checklist. See [account creation, hosting, registry publishing, and submission steps](docs/deployment.md).
 
 ## Reliability and limitations
 
@@ -137,7 +143,7 @@ Submit the exact registry tag **and preferably immutable digest** after actually
 - `/health` reports configuration readiness, not proof of current account quota. Run the live tests before submission and keep the credential, quota, and model available throughout judging.
 - The statement does not specify conflicting overlapping solar reductions. This implementation treats each as a cap relative to the original forecast and uses the strictest remaining fraction. Other overlapping limits are intersected. The statement guarantees feasible, noncontradictory judge scenarios. Cross-midnight ranges include the two daily portions in ascending order. These conventions are disclosed rather than claimed as published organizer rules.
 - Floating-point replay uses 0.00001 internal tolerance and public-reference tests use at most 0.01. Very large values can exceed practical floating-point accuracy; such results fail replay instead of returning an invalid plan. The HTTP adapter's default body limit applies.
-- The hosted LLM may misunderstand an unseen note while still returning structurally valid output. Deterministic validation cannot prove natural-language correctness; live paraphrase tests measure it. Remote latency can exceed the five-second full-score target. A public deployment and a registry image require your accounts.
+- The hosted LLM may misunderstand an unseen note while still returning structurally valid output. Deterministic validation cannot prove natural-language correctness; live paraphrase tests measure it. Remote latency can exceed the five-second full-score target. Availability and cold-start behavior of the public deployment must be monitored throughout judging.
 
 ## Required submission artifacts
 
@@ -147,6 +153,6 @@ Create the GitHub repository after question reveal, keep it private during the e
 
 ## Dependencies and credits
 
-NestJS provides the server and Swagger integration; OpenAI's official JavaScript SDK and Responses API provide language interpretation; Zod validates schemas; `javascript-lp-solver` provides the simplex implementation; dotenv loads local environment configuration; TypeScript, Node.js and npm build/run/test the application. Direct and transitive versions are locked in `package-lock.json`. RxJS and reflect-metadata support NestJS. Docker provides packaging. Test inputs and reference results are supplied by BUP CSE Fest 2026. OpenAI Codex assisted with implementation and verification; the team should review, understand, and be able to explain the code, in accordance with the guide's ownership requirement.
+NestJS provides the server and Swagger integration; OpenAI's official JavaScript SDK and Responses API provide language interpretation; Zod validates schemas; `javascript-lp-solver` provides the simplex implementation; dotenv loads local environment configuration; TypeScript, Node.js and npm build/run/test the application; `@nestjs/testing` provides test-only dependency overrides and Prettier provides consistent source formatting. Direct and transitive versions are locked in `package-lock.json`. RxJS and reflect-metadata support NestJS. Docker provides packaging. Test inputs and reference results are supplied by BUP CSE Fest 2026. OpenAI Codex assisted with implementation and verification; the team should review, understand, and be able to explain the code, in accordance with the guide's ownership requirement.
 
 Implementation references: [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [model documentation](https://developers.openai.com/api/docs/models/gpt-4.1-mini), [NestJS OpenAPI](https://docs.nestjs.com/openapi/introduction), [solver documentation](https://github.com/JWally/jsLPSolver). Video generation additionally uses local Pillow, macOS speech synthesis and FFmpeg; these are not API runtime dependencies.

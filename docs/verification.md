@@ -1,5 +1,7 @@
 # Verification evidence
 
+**Latest:** see [the judge audit](judge-audit.md) for the expanded 44-test suite, 46/46 local and public HTTP checks, fresh GitHub checkout, and published-image verification. Earlier dated results below are retained as history. Video was excluded from the latest audit.
+
 Recorded 2026-09-18T13:40:52.839Z. Real model: `gpt-4.1-mini-2025-04-14`. No key values are included.
 
 ## Post-refactor re-verification (2026-09-18T14:01Z)
@@ -79,7 +81,7 @@ The first live run passed all ten public cases but included the end hour in one 
 
 ## Still external
 
-A public-host deployment, a registry push/pull with an exact tag/digest, a GitHub repository with the required timing/visibility, and an organizer-accessible video upload still require the user's accounts. Local verification does not establish those deliverables. Follow `docs/deployment.md` and complete `docs/submission.md`.
+The public Render service, GitHub repository and published Docker image now exist and have been tested; the earlier pending deployment status is superseded. Remaining external checks are continuous availability/cold-start timing, a second-network endpoint check, repository timing and post-deadline visibility, organizer submission, and video upload/access (excluded from the latest audit). See `docs/submission.md`.
 
 ## Final Docker packaging check
 

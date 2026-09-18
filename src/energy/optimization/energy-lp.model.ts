@@ -84,7 +84,7 @@ export function buildEnergyLinearProgram(
       [`balance${h}`]: 1,
       [`grid${h}`]: 1,
     };
-    model.variables[`scenario${h}`] = {
+    model.variables[`s${h}`] = {
       cost: 0,
       [`balance${h}`]: 1,
       [`solar${h}`]: 1,

@@ -38,7 +38,7 @@ export class EnergyOptimizerService {
       return {
         hour: h,
         grid_kwh: clean(Number(result[`g${h}`] ?? 0)),
-        solar_used_kwh: clean(Number(result[`scenario${h}`] ?? 0)),
+        solar_used_kwh: clean(Number(result[`s${h}`] ?? 0)),
         battery_action:
           change > 0
             ? ("charge" as const)
@@ -61,7 +61,7 @@ export class EnergyOptimizerService {
       total_grid_kwh: hourly_plan.reduce((sum, h) => sum + h.grid_kwh, 0),
       total_cost_bdt,
       peak_grid_kwh: Math.max(...hourly_plan.map((h) => h.grid_kwh)),
-      plan_summary: `Minimum-cost 24-hour plan applies ${applied} operator directive(scenario) and ignores ${directives.length - applied} irrelevant note(scenario). Grid cost is ${total_cost_bdt.toFixed(2)} BDT; final battery energy returns to ${battery.initial_energy_kwh} kWh. Solar curtailment and battery shifts respect all active limits.`,
+      plan_summary: `Minimum-cost 24-hour plan applies ${applied} operator directive(s) and ignores ${directives.length - applied} irrelevant note(s). Grid cost is ${total_cost_bdt.toFixed(2)} BDT; final battery energy returns to ${battery.initial_energy_kwh} kWh. Solar curtailment and battery shifts respect all active limits.`,
     };
   }
 }

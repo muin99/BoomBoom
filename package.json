@@ -4,14 +4,17 @@
   "private": true,
   "description": "GridWise LLM directive interpretation and optimal campus energy scheduling",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "start:dev": "node scripts/dev.cjs",
     "test": "npm run build && node --test test/*.test.cjs",
     "test:live": "npm run build && node scripts/live-test.cjs",
     "test:samples": "node scripts/test-samples.cjs",
     "check:key": "npm run test:live -- --smoke",
-    "export:openapi": "npm run build && node scripts/export-openapi.cjs"
+    "export:openapi": "npm run build && node scripts/export-openapi.cjs",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.cjs\" \"scripts/*.cjs\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.cjs\" \"scripts/*.cjs\"",
+    "test:judge": "npm run build && node scripts/judge-audit.cjs"
   },
   "engines": {
     "node": ">=22"
