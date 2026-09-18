@@ -13,6 +13,33 @@ The flat `src/*.ts` layout described in earlier notes below was reorganized into
 
 This confirms the reorganization did not change request/response behavior, guardrails, optimization results, or containerized startup.
 
+## Live deployment verification (2026-09-18T14:3xZ)
+
+Deployed to Render at `https://buphack.onrender.com` (free plan, Docker runtime, `./Dockerfile`, health check path `/health`; environment variables confirmed matching `.env.example`/`src/config/environment.ts` defaults). Checked externally, from this development machine:
+
+- `GET /health` → 200, `{"status":"ok"}`.
+- `GET /docs` → 200; all Swagger static assets (`swagger-ui.css`, `-bundle.js`, `-standalone-preset.js`, `-init.js`, favicons) resolve; the spec is inlined in the page, so it needs no separate fetch. `GET /docs-json` → 200 and its `paths`/`info` match the checked-in `docs/openapi.json` exactly.
+- `BASE_URL=https://buphack.onrender.com npm run test:samples` → 10/10 public cases pass with correct optimal cost.
+- Structural/guardrail edge cases (malformed JSON, empty body, missing fields, duplicate hour, 23-hour array, unexpected top-level field, >3 or 0 notes, negative demand, numeric-as-string, battery `minimum_energy_kwh` > `capacity_kwh`, wrong HTTP method, unknown route) → each returned the same sanitized 400/404/422 codes as the local/offline suite.
+- An irrelevant operator note, sent through the real hosted LLM → correctly interpreted as `no_op`/`applies:false`.
+- An engineered always-zero grid-cap note → correctly returned `422 INFEASIBLE_SCENARIO` instead of a fabricated plan.
+- 8 concurrent identical requests → all 200 with the identical correct cost (38365 BDT); `/health` still 200 immediately after.
+- Response headers reviewed for `/health`: no stack traces, no credentials; standard `cloudflare`/`Express`/`Render` platform headers only.
+
+Not yet covered externally: a check from a genuinely separate network/device (PG §3's "outside development environment" is only partially satisfied — all checks above ran from the same machine used for development), and sustained availability/cold-start timing on Render's free plan, which spins down after inactivity and can exceed the 60-second readiness budget on first request after a spin-down. See the cold-start note in `docs/submission.md`.
+
+The judge-accessible video upload remains outstanding; that is an external account action, not local verification.
+
+## Docker Hub registry verification (2026-09-18)
+
+- Built `onukrom/gridwise:1.0.0` for `linux/amd64` and pushed it to Docker Hub (public repository).
+- Removed the local image, then pulled it back fresh with `docker pull --platform linux/amd64 onukrom/gridwise:1.0.0` — the plain `docker pull` (no `--platform`) failed on this arm64 development machine with "no matching manifest," since only an amd64 image was published; this is now documented in `docs/deployment.md` and `README.md`.
+- Recorded digest: `sha256:10ca66bc808fc81a2e204cd0927b5740a23043bdb81b65420f7728cd81d7b6b3`.
+- Ran the pulled image as a container with the real OpenAI key (`--env-file .env`); `/health` returned `200 {"status":"ok"}`.
+- `npm run test:samples` against the running container: **10/10 public cases passed** with correct optimal cost.
+- Inspected the image filesystem and `docker history --no-trunc`: no `.env` file and no key/secret-like strings present anywhere in the image or its build history.
+- Removed the temporary verification container after testing; the public Docker Hub repository remains.
+
 ## Completed checks
 
 - TypeScript build succeeds.

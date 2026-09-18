@@ -4,7 +4,7 @@ Complete these steps in your own accounts. Do not share passwords or keys in cha
 
 ## 1. GitHub repository
 
-Create a GitHub account, then open [New repository](https://github.com/new). Name it `gridwise`, choose **Private**, and leave initialization options unchecked. Create it after question reveal; keep it private during the event and switch to public after the organizers' deadline. See [GitHub's instructions](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-new-repository).
+Create a GitHub account, then open [New repository](https://github.com/new). Name it `gridwise`, choose **Private**, and leave initialization options unchecked. Create it after question reveal; keep it private during the event and switch to public after the organizers' deadline. See [GitHub&#39;s instructions](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-new-repository).
 
 Replace `YOUR_ACCOUNT` in these commands:
 
@@ -48,7 +48,7 @@ Open `/docs` on the public URL to verify Swagger. Repeat tests from a second mac
 
 ## 3. Publish the Docker fallback
 
-Create a [Docker Hub account](https://hub.docker.com/) and a repository named `gridwise`. Judges need pull access without manual help; ensure the final image is pullable during evaluation. See [Docker's build-and-share guide](https://docs.docker.com/get-started/tutorials/run-an-app/).
+Create a [Docker Hub account](https://hub.docker.com/) and a repository named `gridwise`. Judges need pull access without manual help; ensure the final image is pullable during evaluation. See [Docker&#39;s build-and-share guide](https://docs.docker.com/get-started/tutorials/run-an-app/).
 
 Replace `YOUR_DOCKERHUB_ACCOUNT` below:
 
@@ -56,12 +56,12 @@ Replace `YOUR_DOCKERHUB_ACCOUNT` below:
 docker login
 docker build --platform linux/amd64 -t YOUR_DOCKERHUB_ACCOUNT/gridwise:1.0.0 .
 docker push YOUR_DOCKERHUB_ACCOUNT/gridwise:1.0.0
-docker pull YOUR_DOCKERHUB_ACCOUNT/gridwise:1.0.0
+docker pull --platform linux/amd64 YOUR_DOCKERHUB_ACCOUNT/gridwise:1.0.0
 docker run --rm --platform linux/amd64 -p 3000:3000 --env-file .env -e PORT=3000 \
   YOUR_DOCKERHUB_ACCOUNT/gridwise:1.0.0
 ```
 
-`linux/amd64` supports typical judge servers even when developing on Apple Silicon. Docker must support emulation for this build. If Buildx is installed, publish both architectures instead:
+`linux/amd64` supports typical judge servers even when developing on Apple Silicon. Docker must support emulation for this build. On Apple Silicon (or any arm64 host), the `--platform linux/amd64` flag on `docker pull` is required, not optional — a plain `docker pull` tries to match the host's native arm64 and fails with "no matching manifest" since only an amd64 image was pushed. Judge servers are typically amd64 already, so they don't need this flag; it's for local verification on an arm64 dev machine. If Buildx is installed, publish both architectures instead so a plain `docker pull` works everywhere:
 
 ```bash
 docker buildx create --use --name gridwise-builder

@@ -121,10 +121,12 @@ Or run `docker compose up --build -d`. Then use the same health and sample test 
 After publishing an image, replace `YOUR_DOCKERHUB_ACCOUNT` with its actual account name:
 
 ```bash
-docker pull YOUR_DOCKERHUB_ACCOUNT/gridwise:1.0.0
-docker run --rm -p 3000:3000 --env-file .env -e PORT=3000 \
+docker pull --platform linux/amd64 YOUR_DOCKERHUB_ACCOUNT/gridwise:1.0.0
+docker run --rm --platform linux/amd64 -p 3000:3000 --env-file .env -e PORT=3000 \
   YOUR_DOCKERHUB_ACCOUNT/gridwise:1.0.0
 ```
+
+On an arm64 host (e.g. Apple Silicon), `--platform linux/amd64` is required on both commands — a plain `docker pull` there fails with "no matching manifest" since only an amd64 image is published. Typical judge servers are amd64 already and don't need the flag.
 
 Submit the exact registry tag **and preferably immutable digest** after actually pushing and testing it. The placeholder above is not a published image. See [account creation, hosting, registry publishing, and submission steps](docs/deployment.md).
 

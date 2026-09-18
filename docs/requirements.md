@@ -27,15 +27,15 @@ PS = `docs/source/problem-statement.txt`; PG = `docs/source/participant-guide.tx
 | PS 465–472 | Equivalent optimal schedules; tolerance 0.01 | Compare validity/cost, not schedule bytes; tighter internal replay |
 | PG §2 | Complete API, source and dependency/configuration files | NestJS source, package lock, TypeScript, Docker, examples, tests |
 | PG §2 | Self-contained README including environment/model/solver/setup/test/limitations | `README.md` |
-| PG §2 | Tested, pullable exact Docker tag/digest, port, bind, no baked secrets | Dockerfile/compose prepared; local image test; external publishing still needed |
-| PG §2 | ≤3-minute video showing problem, architecture, approach and run/tests | Narrated video and script in `deliverables/`; upload/access verification needed |
-| PG §2–3 | One public service exposing both endpoints without login/VPN | Single service, no caller auth; public deployment still needed |
-| PG §3 | Endpoint continuously reachable; tests from outside development environment | External `BASE_URL` runner; needs hosting and second-network check |
+| PG §2 | Tested, pullable exact Docker tag/digest, port, bind, no baked secrets | `onukrom/gridwise:1.0.0` (`sha256:10ca66bc808fc81a2e204cd0927b5740a23043bdb81b65420f7728cd81d7b6b3`) pushed, pulled fresh, and container-tested with all 10 public cases; image scan found no baked secrets |
+| PG §2 | ≤3-minute video showing problem, architecture, approach and run/tests | Narrated video and script in `deliverables/`, duration verified (172.6s); upload/access verification still needed |
+| PG §2–3 | One public service exposing both endpoints without login/VPN | **Live** at `https://buphack.onrender.com`; `/health` and `/optimize-energy` verified externally with no caller auth, including Swagger at `/docs` |
+| PG §3 | Endpoint continuously reachable; tests from outside development environment | `BASE_URL=https://buphack.onrender.com npm run test:samples` passed 10/10 externally, plus edge cases and concurrency; tested from this development machine only — a second network/device check is still recommended. Service is on Render's free plan, which spins down after inactivity; see cold-start risk in `docs/submission.md` |
 | PG §3–4 | Provider available during evaluation; no training jobs | Hosted API, no training; user manages quota and billing |
 | PG §4 | Deterministic processing allowed, solver libraries allowed | Zod guardrails and disclosed simplex solver |
 | PG §4 | Never commit/expose secrets or sensitive stacks/prompts | Git ignore, Docker allowlist, sanitized filters/provider errors, key-redaction tests |
 | PG §4 | Synthetic data only | Organizer samples and synthetic generated scenarios |
-| PG §4 | New repository after reveal; private during event; public after deadline | User action tracked in submission checklist; no premature publication |
+| PG §4 | New repository after reveal; private during event; public after deadline | `https://github.com/muin99/BoomBoom` created and confirmed private (2026-09-18); switch to public only after the submission deadline |
 | PG §4 | Credit tools; team owns/understands core design | README dependency/Codex credits and mathematical explanation; team review needed |
 | PG §5 | API, interpretation, guardrails, energy, robustness, local reproducibility checks | Offline HTTP tests, live runner, reference examples and Docker smoke tests |
 | PG §5 | No secrets in public submission fields | Submission template contains no credentials |
@@ -48,6 +48,6 @@ PS = `docs/source/problem-statement.txt`; PG = `docs/source/participant-guide.tx
 | PG §9 | Invalid/ignored directives, balance/bounds/neutrality/totals lose correctness | Independent final replay blocks invalid successful responses |
 | PG §10 | Hidden paraphrases/numeric variation, no public hardcoding | Live paraphrases, random DP oracle, no production fixture import |
 | PG §10 | Tie-break sequence starts with video then technical subscores | Video plus architecture/correctness evidence prepared |
-| PG §11 | Final checklist including external URL, repo/image/video availability | `docs/submission.md`, with external actions explicitly pending |
+| PG §11 | Final checklist including external URL, repo/image/video availability | `docs/submission.md`; public URL, private repo and Docker Hub image now live and verified, video upload still pending |
 
 The PG optimization-score paragraph ends mid-sentence in the provided PDF after “quality_ratio”; it is not a reason to invent an additional API rule. The optimization objective and zero-cost handling are clear from the canonical problem and the preceding guide text.
