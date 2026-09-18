@@ -9,7 +9,7 @@
     "start:dev": "node scripts/dev.cjs",
     "test": "npm run build && node --test test/*.test.cjs",
     "test:live": "npm run build && node scripts/live-test.cjs",
-    "test:samples": "node scripts/test-samples.cjs",
+    "test:samples": "npm run build && node scripts/test-samples.cjs",
     "check:key": "npm run test:live -- --smoke",
     "export:openapi": "npm run build && node scripts/export-openapi.cjs",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.cjs\" \"scripts/*.cjs\"",

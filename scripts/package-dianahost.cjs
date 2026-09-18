@@ -52,10 +52,7 @@ fs.copyFileSync(
   path.join(root, "docs/openapi.json"),
   path.join(stage, "docs/openapi.json"),
 );
-fs.copyFileSync(
-  path.join(root, "docs/dianahost.md"),
-  path.join(stage, "README.md"),
-);
+fs.copyFileSync(path.join(root, "README.md"), path.join(stage, "README.md"));
 
 // A strict fresh install rejects incompatible transitive Node.js requirements.
 run("npm", [

@@ -4,17 +4,7 @@ A NestJS HTTP service that uses OpenAI to interpret campus operator notes, valid
 
 **Judge endpoints:** `GET /health` and `POST /optimize-energy`. **Swagger:** `/docs`. **OpenAPI JSON:** `/docs-json` or [docs/openapi.json](docs/openapi.json). No login or API key header is required by callers. The OpenAI credential stays on the server.
 
-Public service: [https://bup.onukrom.xyz](https://bup.onukrom.xyz). Source: [muin99/BoomBoom](https://github.com/muin99/BoomBoom). See [the source reading guide](src/README.md) for the module/controller/service layout.
-
-The live service above runs on DianaHost cPanel hosting (Node.js 20.20.2, Passenger) through the separate compatibility package in `deploy/dianahost/`; see [the cPanel walkthrough](docs/dianahost.md) for that deployment and how to rebuild the upload. The root dependency lockfile here targets newer Node.js and is what Docker/Render use.
-
-## Reproducing the deployment elsewhere
-
-This repository is portable beyond DianaHost:
-
-- **Docker (any host):** see [Docker fallback](#docker-fallback) below — build/run locally, or pull the published `onukrom/gridwise` image.
-- **Render (reproducibility target, not the current live service):** this project was previously deployed and fully verified on [Render](https://render.com/) as a Docker web service — 46/46 judge-audit checks passed there too. The steps are kept in [docs/deployment.md](docs/deployment.md#2-deploy-one-api-service-reproducibility-target) if you want to reproduce that path: create a Render account, **New → Web Service**, Docker runtime, Dockerfile path `./Dockerfile`, set the same environment variables as `.env.example`, health-check path `/health`. Render's free plan spins down after inactivity, which risks the judging guide's readiness/request time budgets — use a paid plan or a host that stays warm if you reproduce this way.
-- **DianaHost / other cPanel hosts on old Node.js:** see [docs/dianahost.md](docs/dianahost.md) for the Node 20.20.2 compatibility profile and upload walkthrough used for the current live service.
+**Public service (current, live):** [https://bup.onukrom.xyz](https://bup.onukrom.xyz), deployed on DianaHost cPanel hosting (Node.js 20.20.2, Passenger). **Source:** [muin99/BoomBoom](https://github.com/muin99/BoomBoom). See [the source reading guide](src/README.md) for the module/controller/service layout.
 
 ## Local quickstart
 
@@ -65,7 +55,7 @@ The example is public SAMPLE-01. Expected cost is **38365 BDT** and total grid i
 | `CACHE_TTL_SECONDS` | `300` | Interpretation cache lifetime; `0` disables caching. |
 | `BASE_URL` | `http://localhost:3000` | Target URL for public-sample and judge-audit scripts; the judge audit starts a local server when omitted. |
 
-The provider timeout multiplied by attempts must be at most 25 seconds, leaving room within the 30-second judge limit. Model latency and quota remain external dependencies. No key belongs in a Swagger request, URL, repository, Docker build argument, video, or submission field.
+The provider timeout multiplied by attempts must be at most 25 seconds, leaving room within the 30-second judge limit. Model latency and quota remain external dependencies. No key belongs in a Swagger request, URL, repository, Docker build argument, or submission field.
 
 ## Architecture and exact behavior
 
@@ -74,6 +64,21 @@ JSON → request validation → OpenAI structured note interpretation
      → deterministic directive guardrails → linear-program optimizer
      → independent 24-hour replay → JSON response
 ```
+
+The source is a standard NestJS module/controller/service layout, one feature per module:
+
+| Layer | Source | Responsibility |
+|---|---|---|
+| Bootstrap | `src/main.ts`, `src/bootstrap.ts`, `src/app.module.ts` | Process entry point, Nest app assembly, global pipes/filters/Swagger wiring |
+| Configuration | `src/config/environment.ts`, `src/config/configuration.module.ts`, `.env.example` | Env parsing and a global `APP_CONFIG` provider for credential, model, port and time budget |
+| Shared/common | `src/common/validation/value.schemas.ts`, `src/common/swagger/*`, `src/common/filters/safe-exception.filter.ts` | Shared Zod primitives, OpenAPI schema generation from those same schemas, sanitized error responses |
+| Energy controller | `src/energy/energy.controller.ts`, `src/energy/pipes/optimize-energy-request.pipe.ts` | `POST /optimize-energy` route and Zod-backed request validation pipe |
+| Energy models/DTOs | `src/energy/models/scenario.model.ts`, `plan.model.ts`, `src/energy/dto/optimize-energy-request.dto.ts`, `optimize-energy-response.dto.ts` | Request/output schemas and cross-field guardrails |
+| Energy services | `src/energy/services/energy.service.ts`, `energy-optimizer.service.ts`, `plan-replay.service.ts`, `src/energy/optimization/energy-lp.model.ts` | Orchestration (interpret → validate → optimize → replay), LP construction/solve, independent replay verification |
+| Interpretation | `src/interpretation/services/openai-interpreter.service.ts`, `directive-validator.service.ts`, `interpretation-cache.service.ts`, `providers/openai-client.provider.ts`, `prompts/operator-notes.prompt.ts`, `models/directive.model.ts` | Real OpenAI Responses extraction behind a `NoteInterpreter` interface, deadlines, retries, validated cache, directive guardrails |
+| Health | `src/health/health.controller.ts`, `health.service.ts` | `GET /health` readiness check that exercises the same interpreter dependency |
+
+The energy and health services depend only on the `NOTE_INTERPRETER` interface (`src/interpretation/interfaces/note-interpreter.interface.ts`), not on the OpenAI SDK directly, so the interpretation module can be swapped or mocked without touching scheduling code. See [the source reading guide](src/README.md) for a recommended file-by-file reading order.
 
 The LLM is directly responsible for semantic interpretation of every note. It is not a cosmetic summary generator. No sample phrases, scenario IDs, or reference schedules are embedded in production code. The summary is generated deterministically from the computed plan.
 
@@ -92,7 +97,30 @@ The LLM is directly responsible for semantic interpretation of every note. It is
 | `max_grid_window` | `{hours, max_grid_kwh}` | Grid import cannot exceed the cap in any listed hour. |
 | `no_op` | `null` | No constraint added; `applies=false`. |
 
-Every other directive has `applies=true`. Time windows include the starting hour and exclude the ending hour. Unused solar is curtailed, grid export is prohibited, and terminal stored energy equals the initial energy. The model uses the specification's lossless battery behavior. See [the mathematical formulation](docs/architecture.md).
+Every other directive has `applies=true`. Time windows include the starting hour and exclude the ending hour. Unused solar is curtailed, grid export is prohibited, and terminal stored energy equals the initial energy. The model uses the specification's lossless battery behavior.
+
+### Mathematical formulation
+
+For hour h, the variables are grid energy G[h], solar actually used S[h], and stored energy after the hour E[h]. All are nonnegative continuous variables. E[-1] is the given initial battery energy.
+
+```text
+minimize  Σ tariff[h] × G[h]
+
+G[h] + S[h] - E[h] + E[h-1] = demand[h]
+0 ≤ S[h] ≤ effective_solar[h]
+0 ≤ G[h] ≤ active_grid_cap[h]
+active_reserve[h] ≤ E[h] ≤ capacity
+-allowed_discharge[h] ≤ E[h] - E[h-1] ≤ allowed_charge[h]
+E[23] = initial_energy
+```
+
+There are 72 variables. A finite default grid upper bound of demand plus maximum charging is implied by energy balance and nonnegative solar, so it excludes no valid schedule. No-charge/no-discharge directives set the corresponding allowed rate to zero. A reserve acts after the listed hour, precisely as specified. All hours are jointly optimized, so early charging can prepare for a later cap or reserve.
+
+Let delta = E[h] − E[h−1]. Positive delta becomes `charge` with magnitude delta; negative delta becomes `discharge` with magnitude −delta; zero becomes `idle` with magnitude zero. A single signed difference rules out simultaneous charging and discharging without integer variables or a heuristic. Substitution into the balance equation gives exactly the specified hourly accounting. Every valid schedule can be represented by these variables, and every feasible solution maps back to a valid schedule. Thus solving this LP minimizes the required objective over the entire continuous feasible schedule set, subject to numerical precision.
+
+The solver uses precision 1e-9. Only near-zero noise is cleaned and hourly numbers are retained to nine decimal places. Totals are recomputed from the actual returned grid values and original tariffs. The replay reads each directive independently instead of trusting the optimizer's derived bounds; a failed replay prevents HTTP 200. An independent dynamic-programming oracle (test-only, never in the production path) enumerates stored-energy states across hundreds of generated scenarios to confirm the LP finds the true optimum — see `test/helpers/dp-oracle.cjs`.
+
+The LLM request places notes in the user-data message, keeps the extraction rules in higher-priority instructions, uses strict structured outputs, disables stored Responses, and never includes the API key in message content. Runtime validation still treats every model response as untrusted. No deterministic phrase-matching interpreter or fabricated success path exists.
 
 ## Testing
 
@@ -119,9 +147,7 @@ npm run export:openapi
 
 Offline HTTP tests inject known interpretations strictly inside the test harness. They do **not** prove language understanding. Live tests run all ten public cases plus four newly phrased equivalents and five concurrent repeated requests, compare all machine-checkable interpretation fields, replay using the organizer's ground truth, and require optimal cost within 0.01 BDT. Independent dynamic-programming oracles check 100 original generated cases plus 500 new fractional scenarios with directive combinations, including feasible and infeasible inputs. The judge audit adds 18 hand-authored language/energy edge cases and compares their costs with the independent oracle. Free-text explanations and tied optimal action sequences are not compared byte-for-byte.
 
-Live reports are written to ignored `artifacts/live-test-report.json` or `artifacts/key-check.json`. They record model, timestamp, results and measured p95. Live tests spend API credits. Failed checks exit nonzero. Public examples do not establish hidden-case accuracy.
-
-See [the latest judge audit](docs/judge-audit.md) and [recorded verification results](docs/verification.md) for the completed local checks and measured timings. Use `npm run start:dev` for a compiler/server watcher during further development.
+Live reports are written to ignored `artifacts/live-test-report.json` or `artifacts/key-check.json`. They record model, timestamp, results and measured p95. Live tests spend API credits. Failed checks exit nonzero. Public examples do not establish hidden-case accuracy. Use `npm run start:dev` for a compiler/server watcher during further development.
 
 ## Docker fallback
 
@@ -144,7 +170,25 @@ docker run --rm --platform linux/amd64 -p 3000:3000 --env-file .env -e PORT=3000
 
 On an arm64 host (e.g. Apple Silicon), `--platform linux/amd64` is required on both commands — a plain `docker pull` there fails with "no matching manifest" since only an amd64 image is published. Typical judge servers are amd64 already and don't need the flag.
 
-This digest has been pulled and tested. A later source change does not update this immutable image; publish a new version when releasing changes, and record its new digest in the submission checklist. See [account creation, hosting, registry publishing, and submission steps](docs/deployment.md).
+This digest has been pulled and tested. A later source change does not update this immutable image; publish a new version when releasing changes and record its new digest here.
+
+## Reproducing the deployment elsewhere
+
+This codebase isn't tied to one host. Three verified paths:
+
+**Docker, any host** — see [Docker fallback](#docker-fallback) above.
+
+**Render** (previously the live service, kept as a verified reproducibility path — not the current one): create a [Render](https://render.com/) account, **New → Web Service**, Docker runtime, Dockerfile path `./Dockerfile`, environment variables matching `.env.example`, health-check path `/health`. Render's free plan spins down after inactivity, which risks the judging guide's readiness/request budgets — use a paid plan or another always-on host if you rely on this path.
+
+**DianaHost / other cPanel hosts on old Node.js** (the current live service runs this way): DianaHost's shared hosting offers Node.js 20.20.2 through cPanel's Node.js Selector, older than this repo's main `>=22` target, so a separate pinned-dependency profile lives in `deploy/dianahost/` (NestJS 11, Swagger 11, OpenAI SDK 6 — same application source, same LP solver, same prompt and model).
+
+1. Rebuild the upload from the repository root: `npx --yes --package=node@20.20.2 -c 'node scripts/package-dianahost.cjs --live'`. This stages `deploy/dianahost/` plus current `src/`, builds and tests it on exact Node.js 20.20.2, runs the real OpenAI judge audit (`--live` only; omit it to skip that and save API credits), and produces `artifacts/gridwise-dianahost-node20.zip` with compiled `dist/` already inside — no server-side build needed.
+2. In cPanel: create a subdomain, then **Software → Setup Node.js App → Create Application** with Node.js `20.20.2`, application mode `Production`, an application root outside `public_html`, and startup file `app.js`.
+3. Upload and extract the ZIP directly into that application root (so `app.js`, `package.json`, and `dist/main.js` sit at the top level, not nested).
+4. Add environment variables in the Node.js app panel: `NODE_ENV=production`, `OPENAI_API_KEY`, `OPENAI_MODEL=gpt-4.1-mini-2025-04-14`. Leave `PORT` unset — Passenger routes HTTPS to the app automatically.
+5. Click **Run NPM Install**, then **Restart**. Visit `https://your-subdomain/health` to confirm, then run `BASE_URL=https://your-subdomain npm run test:judge` from your own machine.
+
+If cPanel's install-check shows a content-type warning after "NPM Install," that's a known CloudLinux/Passenger false positive — it just means the app went from a static placeholder page to a real JSON response after restart. Judge that by actually hitting `/health` and `/optimize-energy`, not by that message alone.
 
 ## Reliability and limitations
 
@@ -154,15 +198,14 @@ This digest has been pulled and tested. A later source change does not update th
 - The statement does not specify conflicting overlapping solar reductions. This implementation treats each as a cap relative to the original forecast and uses the strictest remaining fraction. Other overlapping limits are intersected. The statement guarantees feasible, noncontradictory judge scenarios. Cross-midnight ranges include the two daily portions in ascending order. These conventions are disclosed rather than claimed as published organizer rules.
 - Floating-point replay uses 0.00001 internal tolerance and public-reference tests use at most 0.01. Very large values can exceed practical floating-point accuracy; such results fail replay instead of returning an invalid plan. The HTTP adapter's default body limit applies.
 - The hosted LLM may misunderstand an unseen note while still returning structurally valid output. Deterministic validation cannot prove natural-language correctness; live paraphrase tests measure it. Remote latency can exceed the five-second full-score target. The live service runs on shared cPanel hosting (Passenger); an idle application can be recycled and the first request after idle time may be slower than a warm one. Availability throughout judging must be monitored.
+- Node.js 20 (used by the DianaHost compatibility profile) is end-of-life upstream; that profile lets the app run on a host that doesn't yet offer a newer runtime, it doesn't extend Node 20's own support window.
 
-## Required submission artifacts
+## Submission notes
 
-The complete source is here. The [requirements checklist](docs/requirements.md) maps both PDFs to code/tests. The [submission checklist](docs/submission.md) distinguishes local artifacts from external actions still to complete. A narrated MP4 and its source/script are prepared under `deliverables/`; upload the final video or provide a judge-accessible link, and verify it is under three minutes.
-
-Create the GitHub repository after question reveal, keep it private during the event, and make it public only after the submission deadline. Keep the public API, fallback image, repository and video accessible for evaluation. The provided guide's round window is 7–11 PM; it does not establish the actual event date. Follow the organizers' announced timing. Do not submit credentials in public fields.
+Create the GitHub repository after question reveal, keep it private during the event, and make it public only after the submission deadline. Keep the public API, fallback image, and repository accessible for evaluation. The provided guide's round window is 7–11 PM; it does not establish the actual event date. Follow the organizers' announced timing. Do not submit credentials in public fields. No solution video is included with this submission; per the official rubric, the video affects only tie-breaks and carries no base-score points.
 
 ## Dependencies and credits
 
 NestJS provides the server and Swagger integration; OpenAI's official JavaScript SDK and Responses API provide language interpretation; Zod validates schemas; `javascript-lp-solver` provides the simplex implementation; dotenv loads local environment configuration; TypeScript, Node.js and npm build/run/test the application; `@nestjs/testing` provides test-only dependency overrides and Prettier provides consistent source formatting. Direct and transitive versions are locked in `package-lock.json`. RxJS and reflect-metadata support NestJS. Docker provides packaging. Test inputs and reference results are supplied by BUP CSE Fest 2026. OpenAI Codex assisted with implementation and verification; the team should review, understand, and be able to explain the code, in accordance with the guide's ownership requirement.
 
-Implementation references: [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [model documentation](https://developers.openai.com/api/docs/models/gpt-4.1-mini), [NestJS OpenAPI](https://docs.nestjs.com/openapi/introduction), [solver documentation](https://github.com/JWally/jsLPSolver). Video generation additionally uses local Pillow, macOS speech synthesis and FFmpeg; these are not API runtime dependencies.
+Implementation references: [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [model documentation](https://developers.openai.com/api/docs/models/gpt-4.1-mini), [NestJS OpenAPI](https://docs.nestjs.com/openapi/introduction), [solver documentation](https://github.com/JWally/jsLPSolver).
