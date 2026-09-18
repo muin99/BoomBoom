@@ -4,7 +4,17 @@ A NestJS HTTP service that uses OpenAI to interpret campus operator notes, valid
 
 **Judge endpoints:** `GET /health` and `POST /optimize-energy`. **Swagger:** `/docs`. **OpenAPI JSON:** `/docs-json` or [docs/openapi.json](docs/openapi.json). No login or API key header is required by callers. The OpenAI credential stays on the server.
 
-Public service: [https://buphack.onrender.com](https://buphack.onrender.com). Source: [muin99/BoomBoom](https://github.com/muin99/BoomBoom). See [the source reading guide](src/README.md) for the module/controller/service layout.
+Public service: [https://bup.onukrom.xyz](https://bup.onukrom.xyz). Source: [muin99/BoomBoom](https://github.com/muin99/BoomBoom). See [the source reading guide](src/README.md) for the module/controller/service layout.
+
+The live service above runs on DianaHost cPanel hosting (Node.js 20.20.2, Passenger) through the separate compatibility package in `deploy/dianahost/`; see [the cPanel walkthrough](docs/dianahost.md) for that deployment and how to rebuild the upload. The root dependency lockfile here targets newer Node.js and is what Docker/Render use.
+
+## Reproducing the deployment elsewhere
+
+This repository is portable beyond DianaHost:
+
+- **Docker (any host):** see [Docker fallback](#docker-fallback) below — build/run locally, or pull the published `onukrom/gridwise` image.
+- **Render (reproducibility target, not the current live service):** this project was previously deployed and fully verified on [Render](https://render.com/) as a Docker web service — 46/46 judge-audit checks passed there too. The steps are kept in [docs/deployment.md](docs/deployment.md#2-deploy-one-api-service-reproducibility-target) if you want to reproduce that path: create a Render account, **New → Web Service**, Docker runtime, Dockerfile path `./Dockerfile`, set the same environment variables as `.env.example`, health-check path `/health`. Render's free plan spins down after inactivity, which risks the judging guide's readiness/request time budgets — use a paid plan or a host that stays warm if you reproduce this way.
+- **DianaHost / other cPanel hosts on old Node.js:** see [docs/dianahost.md](docs/dianahost.md) for the Node 20.20.2 compatibility profile and upload walkthrough used for the current live service.
 
 ## Local quickstart
 
@@ -97,11 +107,11 @@ npm run test:live
 npm run test:samples
 
 # Against the deployed public endpoint, preferably from a second network
-BASE_URL=https://buphack.onrender.com npm run test:samples
+BASE_URL=https://bup.onukrom.xyz npm run test:samples
 
 # Judge-style checks: 10 public cases, 18 new edge cases, HTTP errors and concurrency
 npm run test:judge
-BASE_URL=https://buphack.onrender.com npm run test:judge
+BASE_URL=https://bup.onukrom.xyz npm run test:judge
 
 # Regenerate the checked-in API documentation
 npm run export:openapi
@@ -143,7 +153,7 @@ This digest has been pulled and tested. A later source change does not update th
 - `/health` reports configuration readiness, not proof of current account quota. Run the live tests before submission and keep the credential, quota, and model available throughout judging.
 - The statement does not specify conflicting overlapping solar reductions. This implementation treats each as a cap relative to the original forecast and uses the strictest remaining fraction. Other overlapping limits are intersected. The statement guarantees feasible, noncontradictory judge scenarios. Cross-midnight ranges include the two daily portions in ascending order. These conventions are disclosed rather than claimed as published organizer rules.
 - Floating-point replay uses 0.00001 internal tolerance and public-reference tests use at most 0.01. Very large values can exceed practical floating-point accuracy; such results fail replay instead of returning an invalid plan. The HTTP adapter's default body limit applies.
-- The hosted LLM may misunderstand an unseen note while still returning structurally valid output. Deterministic validation cannot prove natural-language correctness; live paraphrase tests measure it. Remote latency can exceed the five-second full-score target. Availability and cold-start behavior of the public deployment must be monitored throughout judging.
+- The hosted LLM may misunderstand an unseen note while still returning structurally valid output. Deterministic validation cannot prove natural-language correctness; live paraphrase tests measure it. Remote latency can exceed the five-second full-score target. The live service runs on shared cPanel hosting (Passenger); an idle application can be recycled and the first request after idle time may be slower than a warm one. Availability throughout judging must be monitored.
 
 ## Required submission artifacts
 

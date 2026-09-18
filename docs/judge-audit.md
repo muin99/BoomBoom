@@ -1,5 +1,7 @@
 # Judge audit — 2026-09-18
 
+> **Note:** the public service has since moved to `https://bup.onukrom.xyz` (DianaHost cPanel). This report's "Public Render HTTP audit" row is a point-in-time historical record from when `https://buphack.onrender.com` was live; see [docs/verification.md](verification.md) for the current DianaHost audit (also 46/46) and Render's status as a reproducibility backup. `docs/submission.md` has the current endpoint.
+
 **Verdict:** no functional failure in the exercised public cases, added edge cases, or generated solver cases. The deployed API, GitHub source checkout, and published Docker fallback work. Final submission readiness still depends on hosting availability, repository timing/visibility, and organizer submission. Video was explicitly excluded from this audit. These results do not establish a hidden-judge score.
 
 ## Specification and approach

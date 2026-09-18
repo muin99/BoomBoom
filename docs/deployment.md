@@ -1,5 +1,7 @@
 # Create accounts and deploy
 
+**The current live public service runs on DianaHost cPanel hosting.** Follow [the cPanel upload guide](dianahost.md) and its separate Node.js 20.20.2 compatibility profile to deploy or update it. The sections below (GitHub, Render, Docker Hub) remain as a fully reproducible alternative path — useful if you want a Docker-based host instead of shared cPanel hosting, or as a backup.
+
 Complete these steps in your own accounts. Do not share passwords or keys in chat. Record final URLs in `docs/submission.md`.
 
 ## 1. GitHub repository
@@ -21,7 +23,9 @@ git push -u origin main
 
 Confirm `.env` is ignored and absent from the staged files. Authenticate through GitHub's credential flow; do not put a token in the remote URL. If already inside a repository, inspect existing configuration instead of repeating initialization. No remote repository has been created automatically.
 
-## 2. Deploy one API service
+## 2. Deploy one API service (reproducibility target)
+
+This step is optional: it reproduces the API as a Docker-based Render deployment, kept here for portability and as evidence the codebase isn't tied to one host. The service actually submitted is the DianaHost deployment from the note above.
 
 Create an account at [Render](https://dashboard.render.com/) and connect GitHub with access to this private repository. Choose **New → Web Service**, select the repository, choose **Docker** as language/runtime, and set the Dockerfile path to `./Dockerfile`. Leave the custom Docker command blank. Render supports building directly from a repository's Dockerfile. [Official Docker deployment instructions](https://render.com/docs/docker).
 
